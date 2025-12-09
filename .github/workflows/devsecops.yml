@@ -41,37 +41,28 @@ jobs:
       - name: Ejecutar SCA en sistema
         run: trivy fs . --severity HIGH,CRITICAL --exit-code 1
 
-  dast_zap:
-    name: DAST - OWASP ZAP
-    runs-on: ubuntu-latest
-    needs: sca_trivy
-    steps:
 
-      - name: Checkout código
-        uses: actions/checkout@v3
+ dast_zap:
+   name: DAST - OWASP ZAP
+   runs-on: ubuntu-latest
+   needs: sca_trivy
+   steps:
+     - name: Ejecutar ZAP Baseline Scan contra AWS
+       run: |
+         docker run -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+           -t http://3.88.90.245 \
+           -r zap_report.html
 
-      - name: Construir imagen de la app
-        run: docker build -t appsegura .
+         if grep -q "High" zap_report.html; then
+           echo "Vulnerabilidades HIGH detectadas en AWS. Deteniendo pipeline."
+           exit 1
+         fi
 
-      - name: Levantar aplicación
-        run: docker run -d -p 8080:8080 appsegura
-
-      - name: Ejecutar ZAP Baseline Scan
-        run: |
-          docker run -t --network="host" ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-            -t http://localhost:8080 \
-            -r zap_report.html
-
-          if grep -q "High" zap_report.html; then
-            echo "Vulnerabilidades HIGH detectadas. Deteniendo pipeline."
-            exit 1
-          fi
-
-      - name: Guardar reporte ZAP
-        uses: actions/upload-artifact@v4
-        with:
-          name: zap_report
-          path: zap_report.html
+     - name: Guardar reporte ZAP
+       uses: actions/upload-artifact@v4
+       with:
+         name: zap_report
+         path: zap_report.html
 
   slack_notify:
     name: Notificar Slack
