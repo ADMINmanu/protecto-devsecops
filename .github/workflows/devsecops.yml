@@ -50,7 +50,6 @@ jobs:
       - name: Ejecutar ZAP Baseline Scan contra AWS
         run: |
           docker run -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t http://3.88.90.245 -r zap_report.html
-
           if grep -q "High" zap_report.html; then
             echo "Vulnerabilidades HIGH detectadas en AWS. Deteniendo pipeline."
             exit 1
