@@ -77,16 +77,17 @@ jobs:
       - name: Procesar reporte SCA
         id: parse
         run: |
-          CRIT=$(jq '.Results[].Vulnerabilities // [] | map(select(.Severity=="CRITICAL")) | length' trivy_report.json)
-          HIGH=$(jq '.Results[].Vulnerabilities // [] | map(select(.Severity=="HIGH")) | length' trivy_report.json)
-          MED=$(jq '.Results[].Vulnerabilities // [] | map(select(.Severity=="MEDIUM")) | length' trivy_report.json)
-          LOW=$(jq '.Results[].Vulnerabilities // [] | map(select(.Severity=="LOW")) | length' trivy_report.json)
+          CRIT=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="CRITICAL")] | length' trivy_report.json)
+          HIGH=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="HIGH")] | length' trivy_report.json)
+          MED=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="MEDIUM")] | length' trivy_report.json)
+          LOW=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="LOW")] | length' trivy_report.json)
           INFO=0
           TOTAL=$((CRIT + HIGH + MED + LOW + INFO))
 
           SUMMARY="CRITICAL:$CRIT,HIGH:$HIGH,MEDIUM:$MED,LOW:$LOW,INFO:$INFO,TOTAL:$TOTAL"
           echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
           echo "$SUMMARY" > sca_summary.txt
+
 
       - name: Guardar reporte SCA
         uses: actions/upload-artifact@v4
