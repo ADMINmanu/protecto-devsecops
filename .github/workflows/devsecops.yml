@@ -75,7 +75,7 @@ jobs:
           if [ "${{ needs.dast_zap.result }}" = "failure" ]; then
             MSG="❌ El pipeline DevSecOps FALLÓ (vulnerabilidades detectadas o error en pruebas)"
           else
-             MSG="✅ El pipeline DevSecOps finalizó correctamente"
+            MSG="✅ El pipeline DevSecOps finalizó correctamente"
           fi
 
           curl -X POST -H 'Content-type: application/json' \
