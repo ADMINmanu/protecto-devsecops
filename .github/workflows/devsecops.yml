@@ -52,7 +52,7 @@ jobs:
           docker run --rm \
             -v /tmp:/zap/wrk/:rw \
             ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://3.88.90.245 -r zap_report.html 
+            zap-baseline.py -t http://3.88.90.245 -r zap_report.html
 
           if grep -qi "High" zap_report.html; then
             echo "Vulnerabilidades HIGH detectadas en AWS. Deteniendo pipeline."
@@ -60,10 +60,12 @@ jobs:
           fi
 
       - name: Guardar reporte ZAP
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: zap_report
           path: /tmp/zap_report.html
+
   slack_notify:
     name: Notificar Slack
     runs-on: ubuntu-latest
@@ -73,7 +75,7 @@ jobs:
       - name: Enviar estado del pipeline a Slack
         run: |
           if [ "${{ needs.dast_zap.result }}" = "failure" ]; then
-            MSG="❌ El pipeline DevSecOps FALLÓ (vulnerabilidades detectadas o error en pruebas)"
+            MSG="❌ El pipeline DevSecOps FALLÓ (vulnerabilidades detectadas)"
           else
             MSG="✅ El pipeline DevSecOps finalizó correctamente"
           fi
