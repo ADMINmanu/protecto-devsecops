@@ -48,15 +48,15 @@ jobs:
     needs: sca_trivy
     steps:
       - name: Ejecutar ZAP Baseline Scan contra AWS
-      run: |
-        docker run --rm -v $(pwd):/zap/wrk/:rw \
-          ghcr.io/zaproxy/zaproxy:stable \
-          zap-baseline.py -t http://3.88.90.245 -r zap_report.html
+        run: |
+          docker run --rm -v $(pwd):/zap/wrk/:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://3.88.90.245 -r zap_report.html
 
-        if grep -qi "High" zap_report.html; then
-          echo "Vulnerabilidades HIGH detectadas en AWS. Deteniendo pipeline."
-          exit 1
-        fi
+          if grep -qi "High" zap_report.html; then
+            echo "Vulnerabilidades HIGH detectadas en AWS. Deteniendo pipeline."
+            exit 1
+          fi
 
       - name: Guardar reporte ZAP
         uses: actions/upload-artifact@v4
