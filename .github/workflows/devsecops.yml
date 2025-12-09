@@ -48,7 +48,7 @@ jobs:
     needs: sca_trivy
     steps:
       - name: Checkout código
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Instalar Docker
         run: |
@@ -74,7 +74,7 @@ jobs:
           fi
 
       - name: Guardar reporte ZAP
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: zap_report
           path: zap_report.html
