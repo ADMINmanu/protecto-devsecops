@@ -107,9 +107,9 @@ jobs:
           if [ "${{ needs.sast_semgrep.result }}" = "failure" ] || \
              [ "${{ needs.sca_trivy.result }}" = "failure" ] || \
              [ "${{ needs.dast_zap.result }}" = "failure" ]; then
-              MSG="❌ PIPELINE FALLÓ — Se detectaron vulnerabilidades en SAST, SCA o DAST."
+             MSG="❌ PIPELINE FALLÓ — Se detectaron vulnerabilidades en SAST, SCA o DAST."
           else
-              MSG="✅ PIPELINE EXITOSO — No se detectaron vulnerabilidades."
+             MSG="✅ PIPELINE EXITOSO — No se detectaron vulnerabilidades."
           fi
 
           curl -X POST -H 'Content-type: application/json' \
