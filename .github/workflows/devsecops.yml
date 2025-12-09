@@ -67,7 +67,6 @@ jobs:
     name: DAST - OWASP ZAP
     runs-on: ubuntu-latest
     needs: sca_trivy
-    continue-on-error: true   # <--- Permite generar reporte aunque falle
     steps:
       - name: Ejecutar ZAP Baseline Scan contra AWS
         run: |
@@ -77,14 +76,12 @@ jobs:
           zap-baseline.py -t http://3.88.90.245 -r zap_report.html
 
           if grep -qi "High" zap_report.html; then
-            echo "DAST_FAIL=true" >> $GITHUB_ENV
-          else
-            echo "DAST_FAIL=false" >> $GITHUB_ENV
+            echo "Vulnerabilidades HIGH detectadas en AWS. Deteniendo pipeline."
+            exit 1
           fi
 
-          cp zap_report.html /tmp/zap_report.html
-
       - name: Guardar reporte ZAP
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: zap_report
@@ -97,34 +94,18 @@ jobs:
   slack_notify:
     name: Notificar Slack
     runs-on: ubuntu-latest
-    needs: [sast_semgrep, sca_trivy, dast_zap]
+    needs: dast_zap
     if: always()
     steps:
-      - name: Determinar estado final del pipeline
+      - name: Enviar estado del pipeline a Slack
         run: |
-          SAST="${{ needs.sast_semgrep.result }}"
-          SCA="${{ needs.sca_trivy.result }}"
-          DAST="${{ needs.dast_zap.result }}"
-          HIGH_DAST="${DAST_FAIL}"
-
-          MSG="✅ El pipeline DevSecOps finalizó correctamente"
-
-          if [[ "$SAST" == "failure" ]]; then
-            MSG="❌ SAST detectó vulnerabilidades (Semgrep). Pipeline FALLIDO."
+          if [ "${{ needs.dast_zap.result }}" = "failure" ]; then
+            MSG="❌ El pipeline DevSecOps FALLÓ (se detectaron vulnerabilidades)"
+          else
+            MSG="✅ El pipeline DevSecOps finalizó correctamente"
           fi
 
-          if [[ "$SCA" == "failure" ]]; then
-            MSG="❌ SCA detectó vulnerabilidades HIGH/CRITICAL (Trivy). Pipeline FALLIDO."
-          fi
-
-          if [[ "$DAST" == "failure" || "$HIGH_DAST" == "true" ]]; then
-            MSG="❌ DAST detectó vulnerabilidades HIGH (OWASP ZAP). Pipeline FALLIDO."
-          fi
-
-          echo "MESSAGE=$MSG" >> $GITHUB_ENV
-
-      - name: Enviar mensaje a Slack
-        run: |
           curl -X POST -H 'Content-type: application/json' \
-          --data "{\"text\": \"${MESSAGE}\"}" \
+          --data "{\"text\": \"${MSG}\"}" \
           ${{ secrets.SLACK_WEBHOOK_URL }}
+
