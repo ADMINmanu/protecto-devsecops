@@ -50,6 +50,7 @@ jobs:
       - name: Ejecutar ZAP Baseline Scan contra AWS
         run: |
           docker run --rm -v $(pwd):/zap/wrk/:rw \
+            -v /tmp:/zap/wrk/:rw \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py -t http://3.88.90.245 -r zap_report.html
 
@@ -62,7 +63,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: zap_report
-          path: zap_report.html
+          path: /tmp/zap_report.html
 
   slack_notify:
     name: Notificar Slack
