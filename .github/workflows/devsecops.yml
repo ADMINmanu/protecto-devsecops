@@ -7,6 +7,9 @@ on:
 
 jobs:
 
+  # -------------------------
+  # SAST - SEMGREP
+  # -------------------------
   sast_semgrep:
     name: SAST - Semgrep
     runs-on: ubuntu-latest
@@ -18,9 +21,18 @@ jobs:
         run: pip install semgrep
 
       - name: Ejecutar SAST (Semgrep)
-        run: semgrep --config "p/owasp-top-ten" . --error
+        run: semgrep --config "p/owasp-top-ten" . --error --json > semgrep_report.json
+
+      - name: Guardar reporte SAST
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep_report
+          path: semgrep_report.json
 
 
+  # -------------------------
+  # SCA - TRIVY
+  # -------------------------
   sca_trivy:
     name: SCA - Trivy
     runs-on: ubuntu-latest
@@ -39,9 +51,18 @@ jobs:
           sudo apt-get install trivy -y
 
       - name: Ejecutar SCA en sistema
-        run: trivy fs . --severity HIGH,CRITICAL --exit-code 1
+        run: trivy fs . --severity HIGH,CRITICAL --exit-code 1 --format json -o trivy_report.json
+
+      - name: Guardar reporte SCA
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy_report
+          path: trivy_report.json
 
 
+  # -------------------------
+  # DAST - OWASP ZAP
+  # -------------------------
   dast_zap:
     name: DAST - OWASP ZAP
     runs-on: ubuntu-latest
@@ -50,11 +71,11 @@ jobs:
       - name: Ejecutar ZAP Baseline Scan contra AWS
         run: |
           docker run --rm \
-            -v /tmp:/zap/wrk/:rw \
-            ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://3.88.90.245 -r zap_report.html
+          -v /tmp/:/zap/wrk/:rw \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap-baseline.py -t http://3.88.90.245 -r zap_report.html
 
-          if grep -qi "Medium" zap_report.html; then
+          if grep -qi "High" zap_report.html; then
             echo "Vulnerabilidades HIGH detectadas en AWS. Deteniendo pipeline."
             exit 1
           fi
@@ -66,6 +87,10 @@ jobs:
           name: zap_report
           path: /tmp/zap_report.html
 
+
+  # -------------------------
+  # NOTIFICACIÓN SLACK
+  # -------------------------
   slack_notify:
     name: Notificar Slack
     runs-on: ubuntu-latest
@@ -75,11 +100,11 @@ jobs:
       - name: Enviar estado del pipeline a Slack
         run: |
           if [ "${{ needs.dast_zap.result }}" = "failure" ]; then
-            MSG="❌ El pipeline DevSecOps FALLÓ (vulnerabilidades detectadas)"
+            MSG="❌ El pipeline DevSecOps FALLÓ (se detectaron vulnerabilidades)"
           else
             MSG="✅ El pipeline DevSecOps finalizó correctamente"
           fi
 
           curl -X POST -H 'Content-type: application/json' \
-            --data "{\"text\": \"$MSG\"}" \
+          --data "{\"text\": \"${MSG}\"}" \
           ${{ secrets.SLACK_WEBHOOK_URL }}
