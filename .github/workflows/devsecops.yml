@@ -49,7 +49,7 @@ jobs:
     steps:
       - name: Ejecutar ZAP Baseline Scan contra AWS
         run: |
-          docker run --rm -v $(pwd):/zap/wrk/:rw \
+          docker run --rm \
             -v /tmp:/zap/wrk/:rw \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py -t http://3.88.90.245 -r zap_report.html
