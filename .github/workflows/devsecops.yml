@@ -64,14 +64,20 @@ jobs:
         with:
           name: zap_report
           path: /tmp/zap_report.html
-
   slack_notify:
     name: Notificar Slack
     runs-on: ubuntu-latest
     needs: dast_zap
+    if: always()
     steps:
-      - name: Enviar mensaje a Slack
+      - name: Enviar estado del pipeline a Slack
         run: |
+          if [ "${{ needs.dast_zap.result }}" = "failure" ]; then
+            MSG="❌ El pipeline DevSecOps FALLÓ (vulnerabilidades detectadas o error en pruebas)"
+          else
+             MSG="✅ El pipeline DevSecOps finalizó correctamente"
+          fi
+
           curl -X POST -H 'Content-type: application/json' \
-          --data '{"text":"El pipeline DevSecOps finalizó correctamente."}' \
+            --data "{\"text\": \"$MSG\"}" \
           ${{ secrets.SLACK_WEBHOOK_URL }}
