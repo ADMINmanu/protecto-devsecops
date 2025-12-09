@@ -46,15 +46,30 @@ jobs:
     runs-on: ubuntu-latest
     needs: sca_trivy
     steps:
+
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Instalar Docker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker.io
+          sudo systemctl start docker
+
+      - name: Construir imagen local
+        run: docker build -t appsegura .
+
+      - name: Levantar aplicación
+        run: docker run -d -p 8080:8080 appsegura
+
       - name: Ejecutar ZAP Baseline Scan
         run: |
-          docker run -t owasp/zap2docker-stable zap-baseline.py \
+          docker run -t --network="host" ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
             -t http://localhost:8080 \
             -r zap_report.html
 
-          # Forzar fallo si hay vulnerabilidades HIGH
           if grep -q "High" zap_report.html; then
-            echo "Vulnerabilidades altas detectadas en ZAP. Deteniendo pipeline."
+            echo "Vulnerabilidades HIGH detectadas. Deteniendo pipeline."
             exit 1
           fi
 
@@ -63,7 +78,6 @@ jobs:
         with:
           name: zap_report
           path: zap_report.html
-
 
   slack_notify:
     name: Notificar Slack
