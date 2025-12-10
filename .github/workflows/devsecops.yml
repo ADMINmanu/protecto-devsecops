@@ -13,6 +13,15 @@ jobs:
   sast_semgrep:
     name: SAST - Semgrep
     runs-on: ubuntu-latest
+
+    outputs:
+
+      high: ${{ steps.proc.outputs.high }}
+      med:  ${{ steps.proc.outputs.med }}
+      low:  ${{ steps.proc.outputs.low }}
+      total: ${{ steps.proc.outputs.total }}
+
+
     steps:
       - name: Checkout código
         uses: actions/checkout@v3
@@ -37,11 +46,10 @@ jobs:
 
           TOTAL=$((HIGH + MED + LOW))
 
-          echo "SAST_HIGH=$HIGH" >> $GITHUB_ENV
-          echo "SAST_MED=$MED" >> $GITHUB_ENV
-          echo "SAST_LOW=$LOW" >> $GITHUB_ENV
-          echo "SAST_TOTAL=$TOTAL" >> $GITHUB_ENV
-
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "med=$MED" >> $GITHUB_OUTPUT
+          echo "low=$LOW" >> $GITHUB_OUTPUT
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
 
   #########################################
   #              SCA - TRIVY
@@ -50,6 +58,16 @@ jobs:
     name: SCA - Trivy
     runs-on: ubuntu-latest
     needs: sast_semgrep
+
+
+    outputs:
+      crit:   ${{ steps.proc.outputs.crit }}
+      high:   ${{ steps.proc.outputs.high }}
+      med:    ${{ steps.proc.outputs.med }}
+      low:    ${{ steps.proc.outputs.low }}
+      info:   ${{ steps.proc.outputs.info }}
+      total:  ${{ steps.proc.outputs.total }}
+
     steps:
       - name: Checkout código
         uses: actions/checkout@v3
@@ -86,20 +104,12 @@ jobs:
 
           TOTAL=$((CRIT + HIGH + MED + LOW + INFO))
 
-          echo "SCA_CRIT=$CRIT" >> $GITHUB_ENV
-          echo "SCA_HIGH=$HIGH" >> $GITHUB_ENV
-          echo "SCA_MED=$MED" >> $GITHUB_ENV
-          echo "SCA_LOW=$LOW" >> $GITHUB_ENV
-          echo "SCA_INFO=$INFO" >> $GITHUB_ENV
-          echo "SCA_TOTAL=$TOTAL" >> $GITHUB_ENV
-
-          echo "SCA vulnerabilities detected:"
-          echo "Critical: $CRIT"
-          echo "High: $HIGH"
-          echo "Medium: $MED"
-          echo "Low: $LOW"
-          echo "Info: $INFO"
-
+          echo "crit=$CRIT" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "med=$MED" >> $GITHUB_OUTPUT
+          echo "low=$LOW" >> $GITHUB_OUTPUT
+          echo "info=$INFO" >> $GITHUB_OUTPUT
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
 
 
 
@@ -111,6 +121,14 @@ jobs:
     name: DAST - OWASP ZAP
     runs-on: ubuntu-latest
     needs: sca_trivy
+
+    outputs:
+      high: ${{ steps.proc.outputs.high }}
+      med:  ${{ steps.proc.outputs.med }}
+      low:  ${{ steps.proc.outputs.low }}
+      info: ${{ steps.proc.outputs.info }}
+      total: ${{ steps.proc.outputs.total }}
+
     steps:
       - name: Ejecutar ZAP Baseline Scan
         run: |
@@ -134,55 +152,60 @@ jobs:
 
           TOTAL=$((HIGH + MED + LOW + INFO))
 
-          echo "DAST_HIGH=$HIGH" >> $GITHUB_ENV
-          echo "DAST_MED=$MED" >> $GITHUB_ENV
-          echo "DAST_LOW=$LOW" >> $GITHUB_ENV
-          echo "DAST_INFO=$INFO" >> $GITHUB_ENV
-          echo "DAST_TOTAL=$TOTAL" >> $GITHUB_ENV
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "med=$MED" >> $GITHUB_OUTPUT
+          echo "low=$LOW" >> $GITHUB_OUTPUT
+          echo "info=$INFO" >> $GITHUB_OUTPUT
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
 
-
-  #########################################
-  #       RESUMEN FINAL DE VULNERABILIDADES
-  #########################################
+  ###############################################
+  # RESUMEN FINAL
+  ###############################################
   resumen_final:
     name: Resumen de Vulnerabilidades
     runs-on: ubuntu-latest
     needs: [sast_semgrep, sca_trivy, dast_zap]
-    if: always()
+
     steps:
       - name: Generar resumen en consola
         run: |
           echo "===== RESUMEN FINAL ====="
           echo ""
           echo "---- SAST ----"
-          echo "HIGH: $SAST_HIGH"
-          echo "MEDIUM: $SAST_MED"
-          echo "LOW: $SAST_LOW"
-          echo "TOTAL SAST: $SAST_TOTAL"
+          echo "HIGH:   ${{ needs.sast_semgrep.outputs.high }}"
+          echo "MEDIUM: ${{ needs.sast_semgrep.outputs.med }}"
+          echo "LOW:    ${{ needs.sast_semgrep.outputs.low }}"
+          echo "TOTAL:  ${{ needs.sast_semgrep.outputs.total }}"
           echo ""
           echo "---- SCA ----"
-          echo "CRITICAL: $SCA_CRIT"
-          echo "HIGH: $SCA_HIGH"
-          echo "MEDIUM: $SCA_MED"
-          echo "LOW: $SCA_LOW"
-          echo "INFO: $SCA_INFO"
-          echo "TOTAL SCA: $SCA_TOTAL"
+          echo "CRITICAL: ${{ needs.sca_trivy.outputs.crit }}"
+          echo "HIGH:     ${{ needs.sca_trivy.outputs.high }}"
+          echo "MEDIUM:   ${{ needs.sca_trivy.outputs.med }}"
+          echo "LOW:      ${{ needs.sca_trivy.outputs.low }}"
+          echo "INFO:     ${{ needs.sca_trivy.outputs.info }}"
+          echo "TOTAL:    ${{ needs.sca_trivy.outputs.total }}"
           echo ""
           echo "---- DAST ----"
-          echo "HIGH: $DAST_HIGH"
-          echo "MEDIUM: $DAST_MED"
-          echo "LOW: $DAST_LOW"
-          echo "INFO: $DAST_INFO"
-          echo "TOTAL DAST: $DAST_TOTAL"
+          echo "HIGH:     ${{ needs.dast_zap.outputs.high }}"
+          echo "MEDIUM:   ${{ needs.dast_zap.outputs.med }}"
+          echo "LOW:      ${{ needs.dast_zap.outputs.low }}"
+          echo "INFO:     ${{ needs.dast_zap.outputs.info }}"
+          echo "TOTAL:    ${{ needs.dast_zap.outputs.total }}"
           echo ""
           echo "=========================="
 
       - name: Fallar si hay vulnerabilidades críticas o altas
         run: |
-          TOTAL_HIGH=$((SAST_HIGH + SCA_CRIT + SCA_HIGH + DAST_HIGH))
+          TOTAL_HIGH=$((
+            ${{ needs.sast_semgrep.outputs.high }} +
+            ${{ needs.sca_trivy.outputs.crit }} +
+            ${{ needs.sca_trivy.outputs.high }} +
+            ${{ needs.dast_zap.outputs.high }}
+          ))
+
           if [ "$TOTAL_HIGH" -gt 0 ]; then
             echo "❌ Se detectaron vulnerabilidades CRÍTICAS o ALTAS."
             exit 1
           else
-            echo "✅ No se detectaron vulnerabilidades críticas o altas."
+            echo "✔ No se detectaron vulnerabilidades críticas o altas."
           fi
