@@ -73,7 +73,7 @@ jobs:
           docker run --rm \
           -v /tmp/:/zap/wrk/:rw \
           ghcr.io/zaproxy/zaproxy:stable \
-          zap-baseline.py -t http://3.88.90.245 -r zap_report.html
+          zap-baseline.py -t https://google-gruyere.appspot.com/ -r zap_report.html
 
           if grep -qi "High" zap_report.html; then
             echo "Vulnerabilidades HIGH detectadas en AWS. Deteniendo pipeline."
