@@ -78,7 +78,7 @@ jobs:
           HIGH=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="HIGH")] | length' trivy_report.json)
           MED=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="MEDIUM")] | length' trivy_report.json)
           LOW=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="LOW")] | length' trivy_report.json)
-          INFO=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="UNKNOWN")] | length' trivy_report.json)
+#          INFO=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="UNKNOWN")] | length' trivy_report.json)
 
           TOTAL=$((CRIT + HIGH + MED + LOW + INFO))
 
