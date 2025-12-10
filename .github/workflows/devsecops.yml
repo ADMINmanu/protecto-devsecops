@@ -25,7 +25,9 @@ jobs:
 
       - name: Ejecutar SAST (Semgrep)
         run: |
-          semgrep --config "p/owasp-top-ten" . --error --json > semgrep_report.json
+          semgrep --config "p/owasp-top-ten" . --exclude semgrep_report.json --json --error > semgrep_report.json
+
+
 
       - name: Guardar reporte SAST
         uses: actions/upload-artifact@v4
