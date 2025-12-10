@@ -72,13 +72,17 @@ jobs:
           name: trivy_report
           path: trivy_report.json
 
+
       - name: Procesar reporte SCA
         run: |
-          CRIT=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="CRITICAL")] | length' trivy_report.json)
-          HIGH=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="HIGH")] | length' trivy_report.json)
-          MED=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="MEDIUM")] | length' trivy_report.json)
-          LOW=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="LOW")] | length' trivy_report.json)
-          INFO=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="UNKNOWN" or .Severity=="INFO")] | length' trivy_report.json)
+          echo "📊 Analizando vulnerabilidades SCA..."
+
+          # Extraer vulnerabilidades desde cualquier nivel del JSON
+          CRIT=$(jq '[.. | objects | select(has("Severity")) | select(.Severity=="CRITICAL")] | length' trivy_report.json)
+          HIGH=$(jq '[.. | objects | select(has("Severity")) | select(.Severity=="HIGH")] | length' trivy_report.json)
+          MED=$(jq '[.. | objects | select(has("Severity")) | select(.Severity=="MEDIUM")] | length' trivy_report.json)
+          LOW=$(jq '[.. | objects | select(has("Severity")) | select(.Severity=="LOW")] | length' trivy_report.json)
+          INFO=$(jq '[.. | objects | select(has("Severity")) | select(.Severity=="UNKNOWN" or .Severity=="INFO")] | length' trivy_report.json)
 
           TOTAL=$((CRIT + HIGH + MED + LOW + INFO))
 
@@ -88,6 +92,16 @@ jobs:
           echo "SCA_LOW=$LOW" >> $GITHUB_ENV
           echo "SCA_INFO=$INFO" >> $GITHUB_ENV
           echo "SCA_TOTAL=$TOTAL" >> $GITHUB_ENV
+
+          echo "SCA vulnerabilities detected:"
+          echo "Critical: $CRIT"
+          echo "High: $HIGH"
+          echo "Medium: $MED"
+          echo "Low: $LOW"
+          echo "Info: $INFO"
+
+
+
 
 
   #########################################
