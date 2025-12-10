@@ -7,9 +7,9 @@ on:
 
 jobs:
 
-  # ---------------------------------------------------------
-  # SAST - SEMGREP
-  # ---------------------------------------------------------
+  #########################################
+  #              SAST - SEMGREP
+  #########################################
   sast_semgrep:
     name: SAST - Semgrep
     runs-on: ubuntu-latest
@@ -21,15 +21,7 @@ jobs:
         run: pip install semgrep
 
       - name: Ejecutar SAST (Semgrep)
-        run: |
-          semgrep --config "p/owasp-top-ten" . --error --json > semgrep_report.json
-          # Contar severidades
-          HIGH=$(jq '[.results[] | select(.severity=="ERROR")] | length' semgrep_report.json)
-          MED=$(jq '[.results[] | select(.severity=="WARNING")] | length' semgrep_report.json)
-          LOW=$(jq '[.results[] | select(.severity=="INFO")] | length' semgrep_report.json)
-          echo "SAST_HIGH=$HIGH" >> $GITHUB_OUTPUT
-          echo "SAST_MED=$MED" >> $GITHUB_OUTPUT
-          echo "SAST_LOW=$LOW" >> $GITHUB_OUTPUT
+        run: semgrep --config "p/owasp-top-ten" . --error --json > semgrep_report.json
 
       - name: Guardar reporte SAST
         uses: actions/upload-artifact@v4
@@ -37,10 +29,23 @@ jobs:
           name: semgrep_report
           path: semgrep_report.json
 
+      - name: Procesar reporte SAST
+        run: |
+          HIGH=$(jq '[.results[] | select(.extra.severity=="ERROR")] | length' semgrep_report.json)
+          MED=$(jq '[.results[] | select(.extra.severity=="WARNING")] | length' semgrep_report.json)
+          LOW=$(jq '[.results[] | select(.extra.severity=="INFO")] | length' semgrep_report.json)
 
-  # ---------------------------------------------------------
-  # SCA - TRIVY
-  # ---------------------------------------------------------
+          TOTAL=$((HIGH + MED + LOW))
+
+          echo "SAST_HIGH=$HIGH" >> $GITHUB_ENV
+          echo "SAST_MED=$MED" >> $GITHUB_ENV
+          echo "SAST_LOW=$LOW" >> $GITHUB_ENV
+          echo "SAST_TOTAL=$TOTAL" >> $GITHUB_ENV
+
+
+  #########################################
+  #              SCA - TRIVY
+  #########################################
   sca_trivy:
     name: SCA - Trivy
     runs-on: ubuntu-latest
@@ -58,20 +63,8 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install trivy -y
 
-      - name: Ejecutar SCA
-        run: |
-          trivy fs . --format json -o trivy_report.json || true
-
-          # Contar severidades
-          HIGH=$(jq '[.Results[].Vulnerabilities[]? | select(.Severity=="HIGH")] | length' trivy_report.json)
-          CRIT=$(jq '[.Results[].Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy_report.json)
-          MED=$(jq '[.Results[].Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' trivy_report.json)
-          LOW=$(jq '[.Results[].Vulnerabilities[]? | select(.Severity=="LOW")] | length' trivy_report.json)
-
-          echo "SCA_CRIT=$CRIT" >> $GITHUB_OUTPUT
-          echo "SCA_HIGH=$HIGH" >> $GITHUB_OUTPUT
-          echo "SCA_MED=$MED" >> $GITHUB_OUTPUT
-          echo "SCA_LOW=$LOW" >> $GITHUB_OUTPUT
+      - name: Ejecutar SCA en sistema (NO detiene pipeline)
+        run: trivy fs . --severity HIGH,CRITICAL --exit-code 0 --format json -o trivy_report.json
 
       - name: Guardar reporte SCA
         uses: actions/upload-artifact@v4
@@ -79,69 +72,103 @@ jobs:
           name: trivy_report
           path: trivy_report.json
 
+      - name: Procesar reporte SCA
+        run: |
+          CRIT=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="CRITICAL")] | length' trivy_report.json)
+          HIGH=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="HIGH")] | length' trivy_report.json)
+          MED=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="MEDIUM")] | length' trivy_report.json)
+          LOW=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="LOW")] | length' trivy_report.json)
+          INFO=$(jq '[.Results[].Vulnerabilities // [] | .[] | select(.Severity=="UNKNOWN")] | length' trivy_report.json)
 
-  # ---------------------------------------------------------
-  # DAST - ZAP
-  # ---------------------------------------------------------
+          TOTAL=$((CRIT + HIGH + MED + LOW + INFO))
+
+          echo "SCA_CRIT=$CRIT" >> $GITHUB_ENV
+          echo "SCA_HIGH=$HIGH" >> $GITHUB_ENV
+          echo "SCA_MED=$MED" >> $GITHUB_ENV
+          echo "SCA_LOW=$LOW" >> $GITHUB_ENV
+          echo "SCA_INFO=$INFO" >> $GITHUB_ENV
+          echo "SCA_TOTAL=$TOTAL" >> $GITHUB_ENV
+
+
+  #########################################
+  #              DAST - OWASP ZAP
+  #########################################
   dast_zap:
     name: DAST - OWASP ZAP
     runs-on: ubuntu-latest
     needs: sca_trivy
     steps:
-
       - name: Ejecutar ZAP Baseline Scan
         run: |
-          docker run --rm -v /tmp/:/zap/wrk/:rw \
+          docker run --rm \
+            -v /tmp/:/zap/wrk/:rw \
             ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t https://demo.testfire.net/ -r zap_report.html || true
+            zap-baseline.py -t https://demo.testfire.net/ -r zap_report.html
 
-          # Contar severidades por HTML
-          HIGH=$(grep -o "High" zap_report.html | wc -l)
-          MED=$(grep -o "Medium" zap_report.html | wc -l)
-          LOW=$(grep -o "Low" zap_report.html | wc -l)
-          INFO=$(grep -o "Informational" zap_report.html | wc -l)
-
-          echo "DAST_HIGH=$HIGH" >> $GITHUB_OUTPUT
-          echo "DAST_MED=$MED" >> $GITHUB_OUTPUT
-          echo "DAST_LOW=$LOW" >> $GITHUB_OUTPUT
-          echo "DAST_INFO=$INFO" >> $GITHUB_OUTPUT
-
-      - name: Guardar reporte DAST
+      - name: Guardar reporte ZAP
         uses: actions/upload-artifact@v4
         with:
           name: zap_report
           path: /tmp/zap_report.html
 
+      - name: Procesar reporte DAST
+        run: |
+          HIGH=$(grep -ci "High" zap_report.html || true)
+          MED=$(grep -ci "Medium" zap_report.html || true)
+          LOW=$(grep -ci "Low" zap_report.html || true)
+          INFO=$(grep -ci "Informational" zap_report.html || true)
 
-  # ---------------------------------------------------------
-  # RESUMEN FINAL
-  # ---------------------------------------------------------
-  resumen:
+          TOTAL=$((HIGH + MED + LOW + INFO))
+
+          echo "DAST_HIGH=$HIGH" >> $GITHUB_ENV
+          echo "DAST_MED=$MED" >> $GITHUB_ENV
+          echo "DAST_LOW=$LOW" >> $GITHUB_ENV
+          echo "DAST_INFO=$INFO" >> $GITHUB_ENV
+          echo "DAST_TOTAL=$TOTAL" >> $GITHUB_ENV
+
+
+  #########################################
+  #       RESUMEN FINAL DE VULNERABILIDADES
+  #########################################
+  resumen_final:
     name: Resumen de Vulnerabilidades
     runs-on: ubuntu-latest
     needs: [sast_semgrep, sca_trivy, dast_zap]
+    if: always()
     steps:
-      - name: Mostrar resumen por consola
+      - name: Generar resumen en consola
         run: |
-          echo "======================"
-          echo " RESUMEN DE SAST"
-          echo " HIGH:  ${{ needs.sast_semgrep.outputs.SAST_HIGH }}"
-          echo " MED:   ${{ needs.sast_semgrep.outputs.SAST_MED }}"
-          echo " LOW:   ${{ needs.sast_semgrep.outputs.SAST_LOW }}"
+          echo "===== RESUMEN FINAL ====="
           echo ""
-          echo "======================"
-          echo " RESUMEN DE SCA"
-          echo " CRIT:  ${{ needs.sca_trivy.outputs.SCA_CRIT }}"
-          echo " HIGH:  ${{ needs.sca_trivy.outputs.SCA_HIGH }}"
-          echo " MED:   ${{ needs.sca_trivy.outputs.SCA_MED }}"
-          echo " LOW:   ${{ needs.sca_trivy.outputs.SCA_LOW }}"
+          echo "---- SAST ----"
+          echo "HIGH: $SAST_HIGH"
+          echo "MEDIUM: $SAST_MED"
+          echo "LOW: $SAST_LOW"
+          echo "TOTAL SAST: $SAST_TOTAL"
           echo ""
-          echo "======================"
-          echo " RESUMEN DE DAST"
-          echo " HIGH:  ${{ needs.dast_zap.outputs.DAST_HIGH }}"
-          echo " MED:   ${{ needs.dast_zap.outputs.DAST_MED }}"
-          echo " LOW:   ${{ needs.dast_zap.outputs.DAST_LOW }}"
-          echo " INFO:  ${{ needs.dast_zap.outputs.DAST_INFO }}"
+          echo "---- SCA ----"
+          echo "CRITICAL: $SCA_CRIT"
+          echo "HIGH: $SCA_HIGH"
+          echo "MEDIUM: $SCA_MED"
+          echo "LOW: $SCA_LOW"
+          echo "INFO: $SCA_INFO"
+          echo "TOTAL SCA: $SCA_TOTAL"
           echo ""
-          echo "======================"
-          echo " FIN DEL REPORTE"
+          echo "---- DAST ----"
+          echo "HIGH: $DAST_HIGH"
+          echo "MEDIUM: $DAST_MED"
+          echo "LOW: $DAST_LOW"
+          echo "INFO: $DAST_INFO"
+          echo "TOTAL DAST: $DAST_TOTAL"
+          echo ""
+          echo "=========================="
+
+      - name: Fallar si hay vulnerabilidades críticas o altas
+        run: |
+          TOTAL_HIGH=$((SAST_HIGH + SCA_CRIT + SCA_HIGH + DAST_HIGH))
+          if [ "$TOTAL_HIGH" -gt 0 ]; then
+            echo "❌ Se detectaron vulnerabilidades CRÍTICAS o ALTAS."
+            exit 1
+          else
+            echo "✅ No se detectaron vulnerabilidades críticas o altas."
+          fi
